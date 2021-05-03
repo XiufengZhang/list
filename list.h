@@ -1,9 +1,103 @@
-#include "list.h"
+#ifndef __CLIBS_LIST_H__
+#define __CLIBS_LIST_H__
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/* Includes ------------------------------------------------------------------*/
+#include <stdbool.h>
+#include <stdlib.h>
+
+/* Exported constants --------------------------------------------------------*/
+/* Exported macro ------------------------------------------------------------*/
+#ifndef LIST_MALLOC
+#define LIST_MALLOC malloc
+#endif
+
+#ifndef LIST_FREE
+#define LIST_FREE free
+#endif
+
+#define offsetof(TYPE, MEMBER) ((size_t) & ((TYPE *)0)->MEMBER)
+
+#define container_of(ptr, type, member)                            \
+    ({                                                             \
+        const typeof(((type *)0)->member) *__mptr = (void *)(ptr); \
+        (type *)((char *)__mptr - offsetof(type, member));         \
+    })
+
+// #define WRITE_ONCE(a, b) a = b
+// #define READ_ONCE(a) a
+// #define LIST_POISON1 NULL
+// #define LIST_POISON2 NULL
+
+/* Exported types ------------------------------------------------------------*/
+
+// typedef struct list_head {
+//     struct list_head *next, *prev;
+// } list_head_t;
+
+// typedef struct hlist_head {
+//     struct hlist_node *first;
+// } hlist_head_t;
+
+// typedef struct hlist_node {
+//     struct hlist_node *next, **pprev;
+// } hlist_node_t;
+
+/*
+ * list_t iterator direction.
+ */
+typedef enum { LIST_HEAD, LIST_TAIL } list_direction_t;
+
+/*
+ * list_node_t struct.
+ */
+typedef struct list_node {
+    struct list_node *prev;
+    struct list_node *next;
+    void *val;
+} list_node_t;
+
+/*
+ * list_t struct.
+ */
+typedef struct {
+    list_node_t *head;
+    list_node_t *tail;
+    unsigned int len;
+    void (*free)(void *val);
+    int (*match)(const void *a, const void *b);
+    int (*compare)(const void *a, const void *b);// if a > b, return 1, else return 0;
+} list_t;
+
+// typedef struct list{
+//     list_node_t head;
+//     list_node_t tail;
+//     unsigned int len;
+//     void (*free)(list_node_t *list_node);
+//     int (*insert)(list_node_t *list_node);
+//     int (*insert_asc)(list_node_t *list_node);
+//     int (*insert_desc)(list_node_t *list_node);
+//     int (*find)(list_node_t *list_node);
+//     int (*match)(const list_node_t *a, const list_node_t *b);
+//     int (*compare)(const list_node_t *a, const list_node_t *b);// if a > b, return 1, else return 0;
+// } list_t;
+
+/*
+ * list_t iterator struct.
+ */
+typedef struct {
+    list_node_t *next;
+    list_direction_t direction;
+} list_iterator_t;
+
+/* Exported functions ------------------------------------------------------- */
 /*
  * Allocates a new list_node_t. NULL on failure.
  */
-list_node_t *list_node_new(void *val)
+static inline list_node_t *list_node_new(void *val)
 {
     list_node_t *self;
 
@@ -20,14 +114,14 @@ list_node_t *list_node_new(void *val)
 /*
  * Allocate a new list_t. NULL on failure.
  */
-list_t *list_new(void)
+static inline list_t *list_new(void)
 {
     list_t *self;
     if (!(self = LIST_MALLOC(sizeof(list_t))))
         return NULL;
     self->head = NULL;
     self->tail = NULL;
-    self->free = NULL;
+    self->free = LIST_FREE;
     self->match = NULL;
     self->compare = NULL;
     self->len = 0;
@@ -37,7 +131,7 @@ list_t *list_new(void)
 /*
  * Remove the given node from the list, freeing it and it's value.
  */
-int list_remove(list_t *self, list_node_t *node)
+static inline int list_remove(list_t *self, list_node_t *node)
 {
     if (!self || !node)
         return -1;
@@ -59,7 +153,7 @@ int list_remove(list_t *self, list_node_t *node)
 /*
  * Free the list.
  */
-int list_destroy(list_t *self)
+static inline int list_destroy(list_t *self)
 {
     unsigned int len = 0;
     list_node_t *next = NULL;
@@ -89,7 +183,7 @@ int list_destroy(list_t *self)
  * Append the given node to the list
  * and return the node, NULL on failure.
  */
-list_node_t *list_rpush(list_t *self, list_node_t *node)
+static inline list_node_t *list_rpush(list_t *self, list_node_t *node)
 {
     if (!self || !node)
         return NULL;
@@ -112,7 +206,7 @@ list_node_t *list_rpush(list_t *self, list_node_t *node)
  * Prepend the given node to the list
  * and return the node, NULL on failure.
  */
-list_node_t *list_lpush(list_t *self, list_node_t *node)
+static inline list_node_t *list_lpush(list_t *self, list_node_t *node)
 {
     if (!self || !node)
         return NULL;
@@ -134,7 +228,7 @@ list_node_t *list_lpush(list_t *self, list_node_t *node)
 /*
  * Return / detach the last node in the list, or NULL.
  */
-list_node_t *list_rpop(list_t *self)
+static inline list_node_t *list_rpop(list_t *self)
 {
     if (!self || !self->len)
         return NULL;
@@ -154,7 +248,7 @@ list_node_t *list_rpop(list_t *self)
 /*
  * Return / detach the first node in the list, or NULL.
  */
-list_node_t *list_lpop(list_t *self)
+static inline list_node_t *list_lpop(list_t *self)
 {
     if (!self || !self->len)
         return NULL;
@@ -175,7 +269,7 @@ list_node_t *list_lpop(list_t *self)
  * Allocate a new list_iterator_t with the given start
  * node. NULL on failure.
  */
-static list_iterator_t *list_iterator_new_from_node(list_node_t *node, list_direction_t direction)
+static inline list_iterator_t *list_iterator_new_from_node(list_node_t *node, list_direction_t direction)
 {
     list_iterator_t *self;
     if (!(self = LIST_MALLOC(sizeof(list_iterator_t))))
@@ -189,7 +283,7 @@ static list_iterator_t *list_iterator_new_from_node(list_node_t *node, list_dire
  * Allocate a new list_iterator_t. NULL on failure.
  * Accepts a direction, which may be LIST_HEAD or LIST_TAIL.
  */
-static list_iterator_t *list_iterator_new(list_t *list, list_direction_t direction)
+static inline list_iterator_t *list_iterator_new(list_t *list, list_direction_t direction)
 {
     list_node_t *node = direction == LIST_HEAD ? list->head : list->tail;
     return list_iterator_new_from_node(node, direction);
@@ -199,7 +293,7 @@ static list_iterator_t *list_iterator_new(list_t *list, list_direction_t directi
  * Return the next list_node_t or NULL when no more
  * nodes remain in the list.
  */
-static list_node_t *list_iterator_next(list_iterator_t *self)
+static inline list_node_t *list_iterator_next(list_iterator_t *self)
 {
     list_node_t *curr = self->next;
     if (curr) {
@@ -211,7 +305,7 @@ static list_node_t *list_iterator_next(list_iterator_t *self)
 /*
  * Free the list iterator.
  */
-static void list_iterator_destroy(list_iterator_t *self)
+static inline void list_iterator_destroy(list_iterator_t *self)
 {
     LIST_FREE(self);
     self = NULL;
@@ -220,7 +314,7 @@ static void list_iterator_destroy(list_iterator_t *self)
 /*
  * Return the node associated to val or NULL.
  */
-list_node_t *list_find(list_t *self, const void *val)
+static inline list_node_t *list_find(list_t *self, const void *val)
 {
     list_iterator_t *it = NULL;
     list_node_t *node = NULL;
@@ -251,7 +345,7 @@ list_node_t *list_find(list_t *self, const void *val)
 /*
  * Return the node at the given index or NULL.
  */
-list_node_t *list_at(list_t *self, int index)
+static inline list_node_t *list_at(list_t *self, int index)
 {
     list_direction_t direction = LIST_HEAD;
 
@@ -279,7 +373,7 @@ list_node_t *list_at(list_t *self, int index)
  * Ascending order the given node to the list
  * and return the node, NULL on failure.
  */
-list_node_t *list_push_asc(list_t *self, list_node_t *node_in)
+static inline list_node_t *list_push_asc(list_t *self, list_node_t *node_in)
 {
     list_iterator_t *it = NULL;
     list_node_t *node = NULL;
@@ -324,7 +418,7 @@ list_node_t *list_push_asc(list_t *self, list_node_t *node_in)
  * Descending order the given node to the list
  * and return the node, NULL on failure.
  */
-list_node_t *list_push_desc(list_t *self, list_node_t *node_in)
+static inline list_node_t *list_push_desc(list_t *self, list_node_t *node_in)
 {
     list_iterator_t *it = NULL;
     list_node_t *node = NULL;
@@ -364,3 +458,30 @@ list_node_t *list_push_desc(list_t *self, list_node_t *node_in)
 
     return node_in;
 }
+
+// // Node prototypes.
+// list_node_t *list_node_new(void *val);
+// // list_t prototypes.
+// list_t *list_new(void);
+// int list_remove(list_t *self, list_node_t *node);
+// int list_destroy(list_t *self);
+// list_node_t *list_rpush(list_t *self, list_node_t *node);
+// list_node_t *list_lpush(list_t *self, list_node_t *node);
+// list_node_t *list_push_asc(list_t *self, list_node_t *node_in);
+// list_node_t *list_push_desc(list_t *self, list_node_t *node_in);
+// list_node_t *list_rpop(list_t *self);
+// list_node_t *list_lpop(list_t *self);
+// list_node_t *list_find(list_t *self, const void *val);
+// list_node_t *list_at(list_t *self, int index);
+
+// list_t iterator prototypes.
+// list_iterator_t *list_iterator_new_from_node(list_node_t *node, list_direction_t direction);
+// list_iterator_t *list_iterator_new(list_t *list, list_direction_t direction);
+// list_node_t *list_iterator_next(list_iterator_t *self);
+// void list_iterator_destroy(list_iterator_t *self);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* __CLIBS_LIST_H__ */
